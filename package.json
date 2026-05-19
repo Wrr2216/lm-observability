@@ -1,6 +1,6 @@
 {
   "name": "@loganmct/lm-observability",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Notifications (ntfy), syslog log shipping, and CI/CD helpers for Logan's projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,7 +14,13 @@
     "prepublishOnly": "npm run build",
     "test": "node --test dist/*.test.js || true"
   },
-  "keywords": ["ntfy", "syslog", "logging", "observability", "notifications"],
+  "keywords": [
+    "ntfy",
+    "syslog",
+    "logging",
+    "observability",
+    "notifications"
+  ],
   "author": "Logan Miller",
   "license": "MIT",
   "repository": {
