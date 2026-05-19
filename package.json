@@ -1,6 +1,6 @@
 {
   "name": "@loganmct/lm-observability",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Notifications (ntfy), syslog log shipping, and CI/CD helpers for Logan's projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
