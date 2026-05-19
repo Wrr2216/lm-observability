@@ -25,7 +25,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wrr2216/lm-observability.git"
+    "url": "git+https://github.com/Wrr2216/lm-observability.git"
   },
   "dependencies": {
     "winston": "^3.13.0",
