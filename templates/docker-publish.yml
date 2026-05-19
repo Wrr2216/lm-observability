@@ -1,0 +1,95 @@
+# Copy to .github/workflows/docker-publish.yml in your project.
+# Required secrets: DOCKERHUB_TOKEN, NTFY_TOKEN (optional)
+# Required vars:    DOCKERHUB_USERNAME (default loganmct), NTFY_URL, NTFY_TOPIC
+
+name: Build & Publish Docker Image
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ vars.DOCKERHUB_USERNAME || 'loganmct' }}/${{ github.event.repository.name }}
+  NTFY_URL: ${{ vars.NTFY_URL || 'https://ntfy.lm3114.com' }}
+  NTFY_TOPIC: ${{ vars.NTFY_TOPIC || github.event.repository.name }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Notify build start
+        if: always()
+        run: |
+          curl -s -X POST "${NTFY_URL}/${NTFY_TOPIC}" \
+            -H "Title: ${IMAGE_NAME} build started" \
+            -H "Tags: hammer_and_wrench" \
+            -H "Priority: low" \
+            ${NTFY_TOKEN:+-H "Authorization: Bearer ${NTFY_TOKEN}"} \
+            -d "Commit ${GITHUB_SHA::7} on ${GITHUB_REF_NAME}" || true
+        env:
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME || 'loganmct' }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Notify success
+        if: success()
+        run: |
+          curl -s -X POST "${NTFY_URL}/${NTFY_TOPIC}" \
+            -H "Title: ${IMAGE_NAME} build succeeded" \
+            -H "Tags: white_check_mark" \
+            -H "Priority: default" \
+            ${NTFY_TOKEN:+-H "Authorization: Bearer ${NTFY_TOKEN}"} \
+            -d "Pushed digest ${{ steps.build.outputs.digest }}"
+        env:
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          curl -s -X POST "${NTFY_URL}/${NTFY_TOPIC}" \
+            -H "Title: ${IMAGE_NAME} build FAILED" \
+            -H "Tags: x,rotating_light" \
+            -H "Priority: high" \
+            ${NTFY_TOKEN:+-H "Authorization: Bearer ${NTFY_TOKEN}"} \
+            -d "Failed run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+        env:
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}

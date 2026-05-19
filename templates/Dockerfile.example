@@ -1,0 +1,33 @@
+# Multi-stage Node.js Dockerfile for projects using lm-observability.
+# Copy to Dockerfile in your project root and adapt as needed.
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine AS runtime
+WORKDIR /app
+RUN addgroup -g 1001 -S app && adduser -u 1001 -S app -G app
+COPY --from=deps --chown=app:app /app/node_modules ./node_modules
+COPY --from=build --chown=app:app /app/dist ./dist
+COPY --chown=app:app package*.json ./
+
+ENV NODE_ENV=production \
+    NTFY_URL=https://ntfy.lm3114.com \
+    SYSLOG_HOST=192.168.10.58 \
+    SYSLOG_PORT=514 \
+    SYSLOG_PROTOCOL=udp4
+
+USER app
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "process.exit(0)"
+
+CMD ["node", "dist/index.js"]
