@@ -36,11 +36,11 @@ await ntfy.send({ message: "Backup complete", tags: ["floppy_disk"] });
 | ----------------- | ----------------------------- | -------------------------------- |
 | `APP_NAME`        | `unknown-app`                 | App name (used in titles & topic) |
 | `NODE_ENV`        | `development`                 | Environment label                |
-| `NTFY_URL`        | `https://ntfy.lm3114.com`     | ntfy base URL                    |
+| `NTFY_URL`        | `https://ntfyurl`     | ntfy base URL                    |
 | `NTFY_TOPIC`      | `${APP_NAME}`                 | Topic to publish to              |
 | `NTFY_TOKEN`      | —                             | Bearer token (if topic protected) |
 | `NTFY_ENABLED`    | `true`                        | `false` disables ntfy            |
-| `SYSLOG_HOST`     | `192.168.10.58`               | Syslog server                    |
+| `SYSLOG_HOST`     | `syslog address`               | Syslog server                    |
 | `SYSLOG_PORT`     | `514`                         | Syslog port                      |
 | `SYSLOG_PROTOCOL` | `udp4`                        | `udp4` / `tcp4` / `tls4`         |
 | `SYSLOG_ENABLED`  | `true`                        | `false` disables syslog          |
@@ -95,8 +95,8 @@ Required GitHub secrets in the consuming repo:
 
 Optional GitHub vars:
 
-- `DOCKERHUB_USERNAME` (default `loganmct`)
-- `NTFY_URL` (default `https://ntfy.lm3114.com`)
+- `DOCKERHUB_USERNAME`
+- `NTFY_URL` (default `https://ntfyurl`)
 - `NTFY_TOPIC` (default repo name)
 
 A starter `Dockerfile.example` is included in `templates/`.
