@@ -1,6 +1,6 @@
 {
   "name": "@loganmct/lm-observability",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Notifications (Pushover), syslog log shipping, and CI/CD helpers for Logan's projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
