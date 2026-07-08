@@ -2,11 +2,11 @@
 
 Drop-in observability for Node/TypeScript projects:
 
-- **ntfy notifications** — build start/success/failure, app startup/shutdown/crash
+- **Pushover notifications** — build start/success/failure, app startup/shutdown/crash
 - **Syslog log shipping** — all logs forwarded to a syslog server via `winston-syslog`
-- **CI/CD templates** — GitHub Actions workflow that builds, pushes to Docker Hub, and notifies ntfy
+- **CI/CD templates** — GitHub Actions workflow that builds, pushes to Docker Hub, and notifies Pushover
 
-> No infrastructure endpoints are baked into this package. Both ntfy and syslog auto-disable unless you configure them (env var or `init()` override).
+> No credentials are baked into this package. Both Pushover and syslog auto-disable unless you configure them (env var or `init()` override).
 
 ## Install
 
@@ -19,7 +19,7 @@ npm install @loganmct/lm-observability
 ```ts
 import { init } from "@loganmct/lm-observability";
 
-const { logger, ntfy } = init({
+const { logger, pushover } = init({
   appName: "my-service",
   appMeta: { version: process.env.APP_VERSION },
 });
@@ -27,21 +27,21 @@ const { logger, ntfy } = init({
 logger.info("server up", { port: 3000 });
 
 // Manual notifications
-await ntfy.send({ message: "Backup complete", tags: ["floppy_disk"] });
+await pushover.send({ message: "Backup complete" });
 ```
 
-`init()` auto-registers signal handlers and sends an `appStarted` ntfy on boot, `appStopped` on SIGTERM/SIGINT, and `appCrashed` on uncaught exceptions / unhandled rejections.
+`init()` auto-registers signal handlers and sends an `appStarted` notification on boot, `appStopped` on SIGTERM/SIGINT, and `appCrashed` on uncaught exceptions / unhandled rejections.
 
 ## Config (env vars)
 
 | Var                   | Default        | Purpose                                                  |
 | --------------------- | -------------- | -------------------------------------------------------- |
-| `APP_NAME`            | `unknown-app`  | App name (used in titles & default ntfy topic)           |
+| `APP_NAME`            | `unknown-app`  | App name (used as default notification title)            |
 | `NODE_ENV`            | `development`  | Environment label                                        |
-| `NTFY_URL`            | _(unset)_      | ntfy base URL — **required to enable ntfy**              |
-| `NTFY_TOPIC`          | `${APP_NAME}`  | Topic to publish to                                      |
-| `NTFY_TOKEN`          | _(unset)_      | Bearer token (if topic protected)                        |
-| `NTFY_ENABLED`        | auto           | Auto-disabled when `NTFY_URL` is empty; set `false` to force-off |
+| `PUSHOVER_TOKEN`      | _(unset)_      | Pushover application token — **required to enable Pushover** |
+| `PUSHOVER_USER`       | _(unset)_      | Pushover user/group key — **required to enable Pushover** |
+| `PUSHOVER_DEVICE`     | _(unset)_      | Target a specific device (optional)                      |
+| `PUSHOVER_ENABLED`    | auto           | Auto-disabled when token/user are empty; set `false` to force-off |
 | `SYSLOG_HOST`         | _(unset)_      | Syslog server — **required to enable syslog shipping**   |
 | `SYSLOG_PORT`         | `514`          | Syslog port                                              |
 | `SYSLOG_PROTOCOL`     | `udp4`         | `udp4` / `tcp4` / `tls4`                                 |
@@ -53,29 +53,31 @@ await ntfy.send({ message: "Backup complete", tags: ["floppy_disk"] });
 
 ### `init(opts)`
 
-Returns `{ config, logger, ntfy }`. Overrides any env-var default.
+Returns `{ config, logger, pushover }`. Overrides any env-var default.
 
 ```ts
 init({
   appName: "api",
-  ntfy: { url: "https://ntfy.example.com", topic: "api-prod" },
+  pushover: { token: "azG...", user: "uQi...", device: "iphone" },
   syslog: { host: "10.0.0.5", protocol: "tcp4" },
   autoLifecycle: true,
   onShutdown: async () => { await db.close(); },
 });
 ```
 
-### `ntfy` client
+### `pushover` client
 
 ```ts
-ntfy.buildStart(version?)
-ntfy.buildSuccess(version?, durationMs?)
-ntfy.buildFailure(error, version?)
-ntfy.appStarted(meta?)
-ntfy.appStopped(reason?)
-ntfy.appCrashed(error)
-ntfy.send({ title, message, priority, tags, click, actions })
+pushover.buildStart(version?)
+pushover.buildSuccess(version?, durationMs?)
+pushover.buildFailure(error, version?)
+pushover.appStarted(meta?)
+pushover.appStopped(reason?)
+pushover.appCrashed(error)
+pushover.send({ title, message, priority, sound, url, urlTitle })
 ```
+
+Priorities are named `min | low | default | high | max` and map to Pushover's `-2..2`. `max` is Pushover's emergency priority — it re-alerts every 60s for up to an hour until acknowledged, so reserve it for things that must wake someone up.
 
 ### `logger`
 
@@ -85,10 +87,10 @@ Standard [Winston](https://github.com/winstonjs/winston) logger. Logs go to cons
 
 Copy `templates/docker-publish.yml` into `.github/workflows/` in any project. It will:
 
-1. Notify ntfy when build starts (if `NTFY_URL` is set)
+1. Notify Pushover when build starts (if `PUSHOVER_TOKEN`/`PUSHOVER_USER` secrets are set)
 2. Build the image
 3. Push to `docker.io/<DOCKERHUB_USERNAME>/<repo-name>` with semver / sha / branch tags
-4. Notify ntfy with the digest on success, or the failed run URL on failure
+4. Notify Pushover on success (with digest) or failure (with the failed run URL)
 
 **Required** GitHub repo variables (Settings → Secrets and variables → Actions → Variables):
 
@@ -98,13 +100,21 @@ Copy `templates/docker-publish.yml` into `.github/workflows/` in any project. It
 
 - `DOCKERHUB_TOKEN` — Docker Hub access token
 
-**Optional**:
+**Optional** GitHub repo secrets:
 
-- `NTFY_URL` (var) — base URL of your ntfy server; omit to skip notifications
-- `NTFY_TOPIC` (var) — defaults to repo name
-- `NTFY_TOKEN` (secret) — if your topic requires auth
+- `PUSHOVER_TOKEN` — Pushover application token; omit to skip notifications
+- `PUSHOVER_USER` — Pushover user key; required together with `PUSHOVER_TOKEN`
 
 A starter `Dockerfile.example` is included in `templates/`. It deliberately sets no observability env vars — provide them via your orchestrator (Docker Compose, Dockge stack `.env`, Kubernetes ConfigMap, etc.).
+
+## Migrating from 0.1.x (ntfy)
+
+0.2.0 replaces ntfy with Pushover:
+
+- `init()` now returns `pushover` instead of `ntfy`; `NtfyClient`/`NtfyMessage`/`NtfyPriority` are gone (`PushoverClient`/`PushoverMessage`/`PushoverPriority`).
+- Env vars: `NTFY_URL`/`NTFY_TOPIC`/`NTFY_TOKEN` → `PUSHOVER_TOKEN`/`PUSHOVER_USER` (+ optional `PUSHOVER_DEVICE`).
+- `send()` no longer takes `tags`/`click`/`actions`; use `sound`, `url`, `urlTitle`.
+- Priority names are unchanged.
 
 ## Releasing this package
 

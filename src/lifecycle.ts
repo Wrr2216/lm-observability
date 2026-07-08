@@ -1,15 +1,15 @@
 import type winston from "winston";
-import type { NtfyClient } from "./ntfy";
+import type { PushoverClient } from "./pushover";
 
 export interface LifecycleOptions {
-  ntfy: NtfyClient;
+  pushover: PushoverClient;
   logger: winston.Logger;
   appMeta?: Record<string, unknown>;
   onShutdown?: () => Promise<void> | void;
 }
 
 export function registerLifecycle(opts: LifecycleOptions): void {
-  const { ntfy, logger, appMeta, onShutdown } = opts;
+  const { pushover, logger, appMeta, onShutdown } = opts;
   let shuttingDown = false;
 
   const meta = {
@@ -18,7 +18,7 @@ export function registerLifecycle(opts: LifecycleOptions): void {
     ...appMeta,
   };
 
-  void ntfy.appStarted(meta);
+  void pushover.appStarted(meta);
   logger.info("application started", meta);
 
   const shutdown = async (reason: string, exitCode = 0) => {
@@ -27,7 +27,7 @@ export function registerLifecycle(opts: LifecycleOptions): void {
     logger.info(`shutting down: ${reason}`);
     try {
       if (onShutdown) await onShutdown();
-      await ntfy.appStopped(reason);
+      await pushover.appStopped(reason);
     } catch (err) {
       logger.error("shutdown handler error", { err });
     }
@@ -39,12 +39,12 @@ export function registerLifecycle(opts: LifecycleOptions): void {
 
   process.on("uncaughtException", (err) => {
     logger.error("uncaughtException", { err: err.message, stack: err.stack });
-    void ntfy.appCrashed(err).finally(() => process.exit(1));
+    void pushover.appCrashed(err).finally(() => process.exit(1));
   });
 
   process.on("unhandledRejection", (reason) => {
     const err = reason instanceof Error ? reason : new Error(String(reason));
     logger.error("unhandledRejection", { err: err.message, stack: err.stack });
-    void ntfy.appCrashed(err).finally(() => process.exit(1));
+    void pushover.appCrashed(err).finally(() => process.exit(1));
   });
 }

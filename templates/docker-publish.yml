@@ -2,12 +2,11 @@
 #
 # Required secrets (Settings -> Secrets and variables -> Actions -> Secrets):
 #   DOCKERHUB_TOKEN   - Docker Hub access token
-#   NTFY_TOKEN        - optional, only if your ntfy topic requires auth
+#   PUSHOVER_TOKEN    - optional, Pushover application token (enables notifications)
+#   PUSHOVER_USER     - optional, Pushover user key (required with PUSHOVER_TOKEN)
 #
 # Required repo vars (Settings -> Secrets and variables -> Actions -> Variables):
 #   DOCKERHUB_USERNAME  - your Docker Hub username (image is pushed to <user>/<repo>)
-#   NTFY_URL            - base URL of your ntfy server (e.g. https://ntfy.example.com)
-#   NTFY_TOPIC          - optional, defaults to the repo name
 
 name: Build & Publish Docker Image
 
@@ -20,8 +19,8 @@ on:
 env:
   REGISTRY: docker.io
   IMAGE_NAME: ${{ vars.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
-  NTFY_URL: ${{ vars.NTFY_URL }}
-  NTFY_TOPIC: ${{ vars.NTFY_TOPIC || github.event.repository.name }}
+  PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_TOKEN }}
+  PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
 
 jobs:
   build-and-push:
@@ -40,16 +39,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Notify build start
-        if: env.NTFY_URL != ''
+        if: env.PUSHOVER_TOKEN != '' && env.PUSHOVER_USER != ''
         run: |
-          curl -s -X POST "${NTFY_URL}/${NTFY_TOPIC}" \
-            -H "Title: ${IMAGE_NAME} build started" \
-            -H "Tags: hammer_and_wrench" \
-            -H "Priority: low" \
-            ${NTFY_TOKEN:+-H "Authorization: Bearer ${NTFY_TOKEN}"} \
-            -d "Commit ${GITHUB_SHA::7} on ${GITHUB_REF_NAME}" || true
-        env:
-          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          curl -s https://api.pushover.net/1/messages.json \
+            --form-string "token=${PUSHOVER_TOKEN}" \
+            --form-string "user=${PUSHOVER_USER}" \
+            --form-string "title=${IMAGE_NAME} build started" \
+            --form-string "priority=-1" \
+            --form-string "message=Commit ${GITHUB_SHA::7} on ${GITHUB_REF_NAME}" || true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -84,25 +81,21 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Notify success
-        if: success() && env.NTFY_URL != ''
+        if: success() && env.PUSHOVER_TOKEN != '' && env.PUSHOVER_USER != ''
         run: |
-          curl -s -X POST "${NTFY_URL}/${NTFY_TOPIC}" \
-            -H "Title: ${IMAGE_NAME} build succeeded" \
-            -H "Tags: white_check_mark" \
-            -H "Priority: default" \
-            ${NTFY_TOKEN:+-H "Authorization: Bearer ${NTFY_TOKEN}"} \
-            -d "Pushed digest ${{ steps.build.outputs.digest }}"
-        env:
-          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          curl -s https://api.pushover.net/1/messages.json \
+            --form-string "token=${PUSHOVER_TOKEN}" \
+            --form-string "user=${PUSHOVER_USER}" \
+            --form-string "title=${IMAGE_NAME} build succeeded" \
+            --form-string "priority=0" \
+            --form-string "message=Pushed digest ${{ steps.build.outputs.digest }}" || true
 
       - name: Notify failure
-        if: failure() && env.NTFY_URL != ''
+        if: failure() && env.PUSHOVER_TOKEN != '' && env.PUSHOVER_USER != ''
         run: |
-          curl -s -X POST "${NTFY_URL}/${NTFY_TOPIC}" \
-            -H "Title: ${IMAGE_NAME} build FAILED" \
-            -H "Tags: x,rotating_light" \
-            -H "Priority: high" \
-            ${NTFY_TOKEN:+-H "Authorization: Bearer ${NTFY_TOKEN}"} \
-            -d "Failed run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-        env:
-          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          curl -s https://api.pushover.net/1/messages.json \
+            --form-string "token=${PUSHOVER_TOKEN}" \
+            --form-string "user=${PUSHOVER_USER}" \
+            --form-string "title=${IMAGE_NAME} build FAILED" \
+            --form-string "priority=1" \
+            --form-string "message=Failed run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true

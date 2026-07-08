@@ -1,5 +1,5 @@
 import { loadConfig, type ObservabilityConfig } from "./config";
-import { NtfyClient } from "./ntfy";
+import { PushoverClient } from "./pushover";
 import { createLogger } from "./logger";
 import { registerLifecycle } from "./lifecycle";
 import type winston from "winston";
@@ -7,7 +7,7 @@ import type winston from "winston";
 export interface Observability {
   config: ObservabilityConfig;
   logger: winston.Logger;
-  ntfy: NtfyClient;
+  pushover: PushoverClient;
 }
 
 export interface InitOptions extends Partial<ObservabilityConfig> {
@@ -20,18 +20,18 @@ export function init(opts: InitOptions = {}): Observability {
   const { autoLifecycle = true, appMeta, onShutdown, ...overrides } = opts;
   const config = loadConfig(overrides);
   const logger = createLogger(config);
-  const ntfy = new NtfyClient(config.ntfy, config.appName);
+  const pushover = new PushoverClient(config.pushover, config.appName);
 
   if (autoLifecycle) {
-    registerLifecycle({ ntfy, logger, appMeta, onShutdown });
+    registerLifecycle({ pushover, logger, appMeta, onShutdown });
   }
 
-  return { config, logger, ntfy };
+  return { config, logger, pushover };
 }
 
-export { NtfyClient } from "./ntfy";
+export { PushoverClient } from "./pushover";
 export { createLogger } from "./logger";
 export { loadConfig } from "./config";
 export { registerLifecycle } from "./lifecycle";
 export type { ObservabilityConfig } from "./config";
-export type { NtfyMessage, NtfyPriority } from "./ntfy";
+export type { PushoverMessage, PushoverPriority } from "./pushover";

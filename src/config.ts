@@ -1,10 +1,10 @@
 export interface ObservabilityConfig {
   appName: string;
   environment: string;
-  ntfy: {
-    url: string;
-    topic: string;
-    token?: string;
+  pushover: {
+    token: string;
+    user: string;
+    device?: string;
     enabled: boolean;
   };
   syslog: {
@@ -22,23 +22,25 @@ export interface ObservabilityConfig {
 export function loadConfig(overrides: Partial<ObservabilityConfig> = {}): ObservabilityConfig {
   const env = process.env;
   const appName = overrides.appName ?? env.APP_NAME ?? "unknown-app";
-  const ntfyTopic = overrides.ntfy?.topic ?? env.NTFY_TOPIC ?? appName;
-  const ntfyUrl = overrides.ntfy?.url ?? env.NTFY_URL ?? "";
+  const pushoverToken = overrides.pushover?.token ?? env.PUSHOVER_TOKEN ?? "";
+  const pushoverUser = overrides.pushover?.user ?? env.PUSHOVER_USER ?? "";
   const syslogHost = overrides.syslog?.host ?? env.SYSLOG_HOST ?? "";
 
   // Auto-disable transports when their endpoint isn't configured.
   // Caller can still force-enable via explicit `enabled: true` after providing config.
-  const ntfyEnabled = overrides.ntfy?.enabled ?? (env.NTFY_ENABLED !== "false" && ntfyUrl !== "");
+  const pushoverEnabled =
+    overrides.pushover?.enabled ??
+    (env.PUSHOVER_ENABLED !== "false" && pushoverToken !== "" && pushoverUser !== "");
   const syslogEnabled = overrides.syslog?.enabled ?? (env.SYSLOG_ENABLED !== "false" && syslogHost !== "");
 
   return {
     appName,
     environment: overrides.environment ?? env.NODE_ENV ?? "development",
-    ntfy: {
-      url: ntfyUrl,
-      topic: ntfyTopic,
-      token: overrides.ntfy?.token ?? env.NTFY_TOKEN,
-      enabled: ntfyEnabled,
+    pushover: {
+      token: pushoverToken,
+      user: pushoverUser,
+      device: overrides.pushover?.device ?? env.PUSHOVER_DEVICE,
+      enabled: pushoverEnabled,
     },
     syslog: {
       host: syslogHost,
