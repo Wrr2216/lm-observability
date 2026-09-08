@@ -1,6 +1,7 @@
 import winston from "winston";
 import "winston-syslog";
 import type { ObservabilityConfig } from "./config";
+import { sendWazuh } from "./wazuh";
 
 export function createLogger(cfg: ObservabilityConfig): winston.Logger {
   const transports: winston.transport[] = [];
@@ -40,10 +41,21 @@ export function createLogger(cfg: ObservabilityConfig): winston.Logger {
     );
   }
 
-  return winston.createLogger({
+  const logger = winston.createLogger({
     level: cfg.console.level,
     defaultMeta: { app: cfg.appName, env: cfg.environment },
     transports,
     exitOnError: false,
   });
+  // Mirror operational warnings/errors as bounded alert messages. Metadata is
+  // deliberately excluded: it can contain request bodies, tokens or PII.
+  logger.on("data", (info: { level: string; message: unknown; event_type?: string }) => {
+    // The app's alert adapter sends these through PushoverClient separately.
+    if (info.event_type === "app_alert") return;
+    if (info.level !== "warn" && info.level !== "error") return;
+    void sendWazuh({ app: cfg.appName, title: `${cfg.appName}: ${info.level}`,
+      message: String(info.message), priority: info.level === "error" ? 1 : 0 });
+  });
+  logger.on("error", () => console.error("[lm-observability] log transport failed"));
+  return logger;
 }

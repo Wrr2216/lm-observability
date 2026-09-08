@@ -1,4 +1,5 @@
 import type { ObservabilityConfig } from "./config";
+import { sendWazuh } from "./wazuh";
 
 export type PushoverPriority = "min" | "low" | "default" | "high" | "max";
 
@@ -26,14 +27,27 @@ export class PushoverClient {
   constructor(private readonly cfg: ObservabilityConfig["pushover"], private readonly appName: string) {}
 
   async send(msg: PushoverMessage): Promise<void> {
-    if (!this.cfg.enabled) return;
+    await this.deliver(msg);
+  }
 
+  async deliver(msg: PushoverMessage): Promise<{ pushover: boolean; wazuh: boolean }> {
+    // Independent destinations: an absent Pushover key must not suppress Wazuh.
+    const [wazuh, pushover] = await Promise.all([
+      sendWazuh({ app: this.appName, title: msg.title ?? this.appName,
+        message: msg.message, priority: PRIORITY_MAP[msg.priority ?? "default"] }),
+      this.sendPush(msg),
+    ]);
+    return { pushover, wazuh };
+  }
+
+  private async sendPush(msg: PushoverMessage): Promise<boolean> {
+    if (!this.cfg.enabled) return false;
     const priority = PRIORITY_MAP[msg.priority ?? "default"];
     const body: Record<string, string | number> = {
       token: this.cfg.token,
       user: this.cfg.user,
-      title: msg.title ?? this.appName,
-      message: msg.message,
+      title: Array.from(msg.title ?? this.appName).slice(0, 250).join(""),
+      message: Array.from(msg.message).slice(0, 1024).join(""),
       priority,
     };
     if (this.cfg.device) body.device = this.cfg.device;
@@ -51,12 +65,17 @@ export class PushoverClient {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(5000),
       });
-      if (!res.ok) {
+      const result = await res.json() as { status?: number };
+      if (!res.ok || result.status !== 1) {
         console.error(`[lm-observability] pushover failed: ${res.status} ${res.statusText}`);
+        return false;
       }
+      return true;
     } catch (err) {
-      console.error(`[lm-observability] pushover error:`, err);
+      console.error(`[lm-observability] pushover request failed`);
+      return false;
     }
   }
 

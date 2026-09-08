@@ -1,0 +1,21 @@
+name: Operational alert
+description: Best-effort Pushover and Wazuh notification
+inputs:
+  title:
+    required: true
+    description: Alert title
+  message:
+    required: true
+    description: Alert message
+  priority:
+    default: '0'
+    description: Pushover priority (-2 to 2)
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        ALERT_TITLE: ${{ inputs.title }}
+        ALERT_MESSAGE: ${{ inputs.message }}
+        ALERT_PRIORITY: ${{ inputs.priority }}
+      run: python3 "$GITHUB_ACTION_PATH/notify.py"
