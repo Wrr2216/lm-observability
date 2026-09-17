@@ -35,3 +35,5 @@ export { loadConfig } from "./config";
 export { registerLifecycle } from "./lifecycle";
 export type { ObservabilityConfig } from "./config";
 export type { PushoverMessage, PushoverPriority } from "./pushover";
+export { sendWazuh, formatAlert } from "./wazuh";
+export type { AlertEvent } from "./wazuh";

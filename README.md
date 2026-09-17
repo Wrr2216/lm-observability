@@ -3,6 +3,7 @@
 Drop-in observability for Node/TypeScript projects:
 
 - **Pushover notifications** — build start/success/failure, app startup/shutdown/crash
+- **Wazuh alerts** — notifications and warning/error messages to a separate TCP/UDP syslog receiver
 - **Syslog log shipping** — all logs forwarded to a syslog server via `winston-syslog`
 - **CI/CD templates** — GitHub Actions workflow that builds, pushes to Docker Hub, and notifies Pushover
 
@@ -11,7 +12,7 @@ Drop-in observability for Node/TypeScript projects:
 ## Install
 
 ```bash
-npm install @loganmct/lm-observability
+npm install ./vendor/loganmct-lm-observability-0.2.1.tgz
 ```
 
 ## Quick start
@@ -85,12 +86,12 @@ Standard [Winston](https://github.com/winstonjs/winston) logger. Logs go to cons
 
 ## CI/CD template
 
-Copy `templates/docker-publish.yml` into `.github/workflows/` in any project. It will:
+Copy `templates/docker-publish.yml` into `.github/workflows/` and `templates/notify/` into `.github/actions/notify/` in any project. It will:
 
-1. Notify Pushover when build starts (if `PUSHOVER_TOKEN`/`PUSHOVER_USER` secrets are set)
+1. Notify Pushover and Wazuh when build starts (each destination is independent)
 2. Build the image
 3. Push to `docker.io/<DOCKERHUB_USERNAME>/<repo-name>` with semver / sha / branch tags
-4. Notify Pushover on success (with digest) or failure (with the failed run URL)
+4. Notify Pushover and Wazuh on success or failure, with the run URL and commit
 
 **Required** GitHub repo variables (Settings → Secrets and variables → Actions → Variables):
 
@@ -126,3 +127,17 @@ git push --follow-tags
 ```
 
 The bundled `.github/workflows/publish.yml` builds and publishes to npm with provenance. Requires `NPM_TOKEN` secret in the repo.
+
+## Wazuh delivery (0.2.1)
+
+Set `WAZUH_HOST=51.81.233.158`, `WAZUH_PORT=514`, and `WAZUH_PROTOCOL=tcp`.
+Leave the host unset or set `WAZUH_ENABLED=false` to disable it. Wazuh is
+independent of Pushover configuration and the existing SYSLOG destination.
+`pushover.deliver(message)` returns `{ pushover: boolean, wazuh: boolean }`;
+`pushover.send(message)` retains the existing `Promise<void>` interface.
+Both destinations use bounded timeouts. See [alert setup](docs/alerting.md)
+for the manager decoder/rules and CI runner source allowlist requirements.
+
+To vendor this unreleased build: `npm ci && npm run build && npm pack`.
+Copy the resulting tarball into each consumer's `vendor/` directory and update
+its manifest and lockfile. Run `npm test` for isolated transport tests.

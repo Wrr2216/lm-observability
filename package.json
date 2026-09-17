@@ -1,18 +1,20 @@
 {
   "name": "@loganmct/lm-observability",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Notifications (Pushover), syslog log shipping, and CI/CD helpers for Logan's projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
     "templates",
+    "docs",
+    "wazuh",
     "README.md"
   ],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
-    "test": "node --test dist/*.test.js || true"
+    "test": "npm run build && node --test test/*.test.cjs"
   },
   "keywords": [
     "pushover",
